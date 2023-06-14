@@ -61,6 +61,7 @@ class PipeNetDataLoader(Dataset):
 
         self.cat = [line.rstrip() for line in open(self.catfile)]
         self.classes = dict(zip(self.cat, range(len(self.cat))))
+        print("classes", self.classes)
 
         shape_ids = {}
         if self.num_category == 10:
@@ -71,9 +72,11 @@ class PipeNetDataLoader(Dataset):
             shape_ids['test'] = [line.rstrip() for line in open(os.path.join(self.root, 'modelnet40_test.txt'))]
 
         assert (split == 'train' or split == 'test')
-        shape_names = ['_'.join(x.split('_')[0:-1]) for x in shape_ids[split]]
+        shape_names = ['_'.join(x.split('_')[0:-11]) for x in shape_ids[split]]
+        # print("shape_names", shape_names)
         self.datapath = [(shape_names[i], os.path.join(self.root, shape_names[i], shape_ids[split][i]) + '.txt') for i
                          in range(len(shape_ids[split]))]
+        # print("self.datapath", self.datapath)
         print('The size of %s data is %d' % (split, len(self.datapath)))
 
         if self.uniform:
@@ -82,6 +85,8 @@ class PipeNetDataLoader(Dataset):
             self.save_path = os.path.join(root, 'modelnet%d_%s_%dpts.dat' % (self.num_category, split, self.npoints))
 
         if self.process_data:
+            print("preprocessing data not supported for pipenet, exiting...")
+            exit()
             if not os.path.exists(self.save_path):
                 print('Processing data %s (only running in the first time)...' % self.save_path)
                 self.list_of_points = [None] * len(self.datapath)
@@ -116,9 +121,19 @@ class PipeNetDataLoader(Dataset):
             point_set, label = self.list_of_points[index], self.list_of_labels[index]
         else:
             fn = self.datapath[index]
-            cls = self.classes[self.datapath[index][0]]
+            cls = self.classes[fn[0]]
             label = np.array([cls]).astype(np.int32)
             point_set = np.loadtxt(fn[1], delimiter=',').astype(np.float32)
+            
+            radius = float(fn[1].split("_")[-1].replace(".txt", ""))
+            normal = np.array([float(fn[1].split("_")[-5]),
+                              float(fn[1].split("_")[-4]),
+                              float(fn[1].split("_")[-3])])
+            direction = np.array([float(fn[1].split("_")[-9]),
+                              float(fn[1].split("_")[-8]),
+                              float(fn[1].split("_")[-7])])
+            
+            # print(fn[0], direction, normal, radius)
 
             if self.uniform:
                 point_set = farthest_point_sample(point_set, self.npoints)
@@ -129,7 +144,7 @@ class PipeNetDataLoader(Dataset):
         if not self.use_normals:
             point_set = point_set[:, 0:3]
 
-        return point_set, label[0]
+        return point_set, label[0], direction, normal, radius
 
     def __getitem__(self, index):
         return self._get_item(index)
