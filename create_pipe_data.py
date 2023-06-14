@@ -5,6 +5,8 @@ import random
 from scipy.spatial.transform import Rotation as R
 import open3d as o3d
 
+random.seed(42)
+
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 DATA_DIR = os.path.join(ROOT_DIR, "data")
@@ -19,7 +21,7 @@ os.makedirs(NO_PIPE_DIR, exist_ok=True)
 YES_PIPE_DIR = os.path.join(PIPEDATA_DIR, "pipe")
 os.makedirs(YES_PIPE_DIR, exist_ok=True)
 
-if 0:
+if 1:
         
     cnt = 0
     for i, d in enumerate(os.listdir(MODELNET40_DIR)):
@@ -33,7 +35,7 @@ if 0:
             for txt_file in txt_filenames:
                 txt_abs_path = os.path.join(CASE_DIR, txt_file)
                 
-                new_filename = os.path.join(NO_PIPE_DIR, f"no_pipe_{cnt:05d}.txt")
+                new_filename = os.path.join(NO_PIPE_DIR, f"no_pipe_{cnt:05d}_d_0_0_0_n_0_0_0_r_0.txt")
                 
                 print(f"copy {txt_abs_path} to {new_filename}")
                 shutil.copy(txt_abs_path, new_filename)
@@ -115,6 +117,12 @@ if 1:
                     for i in range(1, len(scan.hit_geometry)):
                         hit_geom = hit_geom.append(scan.hit_geometry[i], 0)
                     
+                    # print(np.dot(pipe.currentTransform, np.array([1, 0, 0, 0])))
+                    pipe_dir = np.dot(new_pipe_1.currentTransform, np.array([1, 0, 0, 0]))[:3]
+                    print("pipe direction:", pipe_dir)
+                    # print(np.dot(new_pipe_2.currentTransform, np.array([1, 0, 0, 0])))
+                    # exit()
+                    
                     # print(scan.pointcloud.point["positions"].shape)
                     # print(hit_geom == 2)
                     # print(scan.pointcloud.point["positions"][hit_geom == 0])
@@ -155,6 +163,16 @@ if 1:
                                 print("number of points in sample is too low", number_of_points_in_sample, "Exiting...")
                                 exit()
                         
+                        print("point:", random_point.numpy())
+                        pipe_pos = new_pipe_1.currentTransform[:3, 3]
+                        print("pipe position:", pipe_pos)
+                        pipe_to_point = random_point.numpy() - pipe_pos
+                        print("pipe to point:", pipe_to_point)
+                        centerline_to_point = pipe_to_point - pipe_to_point * pipe_dir
+                        print("distance point to centerline:", np.linalg.norm(centerline_to_point))
+                        point_normal = centerline_to_point / np.linalg.norm(centerline_to_point)
+                        print("normal at point:", point_normal)
+                        
                         for j in range(number_of_rotation_transforms):
                             
                             sphere_o3d_copy = sphere_o3d.clone()
@@ -168,13 +186,21 @@ if 1:
                             T = T2.dot(T1)
                             
                             sphere_o3d_copy.transform(T)
+                            
+                            transformed_point_normal = np.dot(T[:3, :3], point_normal)
+                            transformed_pipe_dir = np.dot(T[:3, :3], pipe_dir)
+                            
+                            assert(np.linalg.norm(transformed_point_normal) - 1 < 1e-6)
+                            assert(np.linalg.norm(transformed_pipe_dir) - 1 < 1e-6)
+                            # print(transformed_point_normal, transformed_pipe_dir, np.cross(transformed_point_normal, transformed_pipe_dir), np.linalg.norm(np.cross(transformed_point_normal, transformed_pipe_dir)))
+                            assert(np.linalg.norm(np.cross(transformed_point_normal, transformed_pipe_dir)) - 1 < 1e-6)
                         
                             numpy_positions = sphere_o3d_copy.point["positions"].numpy()
                         
                             numpy_positions = np.hstack((numpy_positions, np.zeros(numpy_positions.shape)))
                             # print(sphere_o3d.point["positions"])
                             # ao3d.visualise(sphere_o3d_copy.to_legacy())
-                            case_filename = os.path.join(YES_PIPE_DIR, f"pipe_{yes_cnt:05d}.txt")
+                            case_filename = os.path.join(YES_PIPE_DIR, f"pipe_{yes_cnt:05d}_d_{'_'.join(transformed_pipe_dir.astype(str))}_n_{'_'.join(transformed_point_normal.astype(str))}_r_{float(nominal_diameter)/2}.txt")
                             print(f"saving {case_filename}")
                             np.savetxt(case_filename, numpy_positions, delimiter=',')
                             yes_cnt += 1
