@@ -57,21 +57,33 @@ class get_model(nn.Module):
         n = self.drop1(F.relu(self.bn1(self.fc1(n))))
         n = self.drop2(F.relu(self.bn2(self.fc2(n))))
         n = self.fc_3(n)
-        print("n:", n)
-        print("n size:", n.size())
-        print("n norm:", torch.norm(n, dim=1))
-        exit()
+        # print("n:", n)
+        # print("n size:", n.size())
+        # print("n norm:", torch.norm(n, dim=1))
+        # exit()
 
-        return cl, r, d, n, l3_points
+        return cl, d, n, r, l3_points
 
 
 class get_loss(nn.Module):
     def __init__(self):
         super(get_loss, self).__init__()
 
-    def forward(self, pred, target, trans_feat):
-        total_loss = F.nll_loss(pred, target)
-
+    def forward(self, pred_label, pred_direction, pred_normal, pred_radius, target_label, target_direction, target_normal, target_radius, trans_feat):
+        classification_loss = F.nll_loss(pred_label, target_label)
+        print(target_label)
+        print("classification loss", classification_loss)
+        
+        direction_loss = (torch.norm(pred_direction - target_direction, dim=1)*target_label).sum() / target_label.sum()
+        print("direction loss", direction_loss)
+        
+        normal_loss = (torch.norm(pred_normal - target_normal, dim=1)*target_label).sum() / target_label.sum()
+        print("normal loss", normal_loss)
+        
+        radius_loss = (torch.abs(target_radius - torch.flatten(pred_radius))*target_label).sum() / target_label.sum()
+        print("radius loss", radius_loss)
+        
+        total_loss = 2.5*classification_loss + 2*direction_loss + 2*normal_loss + 0.5*radius_loss
         return total_loss
 
 
