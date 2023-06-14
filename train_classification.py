@@ -6,6 +6,7 @@ Date: Nov 2019
 import os
 import sys
 import torch
+import torch.onnx
 import numpy as np
 
 import datetime
@@ -17,7 +18,7 @@ import argparse
 
 from pathlib import Path
 from tqdm import tqdm
-from data_utils.ModelNetDataLoader import ModelNetDataLoader
+from data_utils.ModelNetDataLoader import PipeNetDataLoader
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
@@ -30,7 +31,7 @@ def parse_args():
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--batch_size', type=int, default=24, help='batch size in training')
     parser.add_argument('--model', default='pointnet_cls', help='model name [default: pointnet_cls]')
-    parser.add_argument('--num_category', default=40, type=int, choices=[10, 40],  help='training on ModelNet10/40')
+    parser.add_argument('--num_category', default=40, type=int, choices=[2, 10, 40],  help='training on ModelNet10/40')
     parser.add_argument('--epoch', default=200, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--num_point', type=int, default=1024, help='Point Number')
@@ -116,10 +117,11 @@ def main(args):
 
     '''DATA LOADING'''
     log_string('Load dataset ...')
-    data_path = 'data/modelnet40_normal_resampled/'
+    # data_path = 'data/modelnet40_normal_resampled/'
+    data_path = 'data/pipes/'
 
-    train_dataset = ModelNetDataLoader(root=data_path, args=args, split='train', process_data=args.process_data)
-    test_dataset = ModelNetDataLoader(root=data_path, args=args, split='test', process_data=args.process_data)
+    train_dataset = PipeNetDataLoader(root=data_path, args=args, split='train', process_data=args.process_data)
+    test_dataset = PipeNetDataLoader(root=data_path, args=args, split='test', process_data=args.process_data)
     trainDataLoader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=10, drop_last=True)
     testDataLoader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=10)
 
@@ -131,6 +133,12 @@ def main(args):
     shutil.copy('./train_classification.py', str(exp_dir))
 
     classifier = model.get_model(num_class, normal_channel=args.use_normals)
+    
+    # print(classifier)
+    # torch.onnx.export(classifier, torch.randn(1, 3, 1024), "model.onnx", verbose=True)
+    # #traced_script_module = torch.jit.trace(classifier, torch.randn(24, 3, 1024))
+    # #traced_script_module.save("traced_resnet_model.pt")
+    # exit()
     criterion = model.get_loss()
     classifier.apply(inplace_relu)
 
@@ -172,7 +180,10 @@ def main(args):
         classifier = classifier.train()
 
         scheduler.step()
-        for batch_id, (points, target) in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
+        for batch_id, (points, target_label, target_direction, target_normal, target_radius) in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
+            # print(points.size(), target)
+            # continue
+            
             optimizer.zero_grad()
 
             points = points.data.numpy()
@@ -180,16 +191,29 @@ def main(args):
             points[:, :, 0:3] = provider.random_scale_point_cloud(points[:, :, 0:3])
             points[:, :, 0:3] = provider.shift_point_cloud(points[:, :, 0:3])
             points = torch.Tensor(points)
+            
             points = points.transpose(2, 1)
+            print(points.size())
 
             if not args.use_cpu:
-                points, target = points.cuda(), target.cuda()
+                points, target_label, target_direction, target_normal, target_radius = points.cuda(), target_label.cuda(), target_direction.cuda(), target_normal.cuda(), target_radius.cuda()
 
-            pred, trans_feat = classifier(points)
-            loss = criterion(pred, target.long(), trans_feat)
-            pred_choice = pred.data.max(1)[1]
+            pred_label, pred_direction, pred_normal, pred_radius, trans_feat = classifier(points)
+            # print(pred)
+            print("pred size =", pred_label.size())
+            print(target_label.long())
+            print("target size =", target_label.size())
+            # continue
+            # exit()
+            loss = criterion(pred_label, pred_direction, pred_normal, pred_radius, target_label.long(), target_direction, target_normal, target_radius, trans_feat)
+            pred_choice = pred_label.data.max(1)[1]
 
-            correct = pred_choice.eq(target.long().data).cpu().sum()
+            print(loss)
+            print("loss size:", loss.size())
+            #continue
+            #exit()
+
+            correct = pred_choice.eq(target_label.long().data).cpu().sum()
             mean_correct.append(correct.item() / float(points.size()[0]))
             loss.backward()
             optimizer.step()
