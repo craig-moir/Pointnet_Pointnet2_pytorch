@@ -87,7 +87,7 @@ def test(model, loader, num_class=40):
         small_radius_loss = (torch.abs(target_radius - torch.flatten(pred_radius))/(target_radius*A5)*target_label).sum()
         radius_loss = big_radius_loss + small_radius_loss
     
-        if target_label.sum().item() == 0:
+        if target_label.sum().item() != 0:
             direction_loss /= target_label.sum()
             normal_loss /= target_label.sum()
             radius_loss /= target_label.sum()
