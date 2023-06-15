@@ -54,7 +54,7 @@ if 1:
     import pyautopipe.open3d as ao3d
 
     import pyautopipe
-    pyautopipe.setResourcesPath(os.path.join(AUTOPIPEFIT_DIR, 'resources'))
+    pyautopipe.setResourcesPath(os.path.join(AUTOPIPEFIT_DIR_2, 'resources'))
     
     pipe_data_list = pyautopipe.loadASMEPipes()
     elbow_data_list = pyautopipe.loadASMEElbows()
