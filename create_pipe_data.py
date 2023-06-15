@@ -47,6 +47,8 @@ if 1:
     import sys
     AUTOPIPEFIT_DIR = os.path.join("/", "home", "craig", "autopipefit")
     sys.path.insert(0, os.path.join(AUTOPIPEFIT_DIR, "pysrc"))
+    AUTOPIPEFIT_DIR_2 = os.path.join(ROOT_DIR, "autopipefit")
+    sys.path.insert(0, os.path.join(AUTOPIPEFIT_DIR_2, "pysrc"))
     
     from pyautopipe.virtual_scan import VirtualScanImage
     import pyautopipe.open3d as ao3d
