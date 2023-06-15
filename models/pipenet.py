@@ -90,7 +90,6 @@ class get_loss(nn.Module):
         print("radius loss", radius_loss, "(", big_radius_loss, "+", small_radius_loss, ")")
         # print(target_radius, torch.abs(target_radius - torch.flatten(pred_radius))*target_label, torch.abs(target_radius - torch.flatten(pred_radius)))
         
-        total_loss = 2.5*classification_loss + 2*direction_loss + 2*normal_loss + 0.5*radius_loss
-        return total_loss
+        return classification_loss, direction_loss, normal_loss, radius_loss
 
 
