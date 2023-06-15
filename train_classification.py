@@ -52,8 +52,10 @@ def inplace_relu(m):
 
 def test(model, loader, num_class=40):
     mean_correct = []
-    mean_radius_difference = []
+    mean_direction_difference = []
     mean_normal_difference = []
+    mean_radius_difference = []
+    
     class_acc = np.zeros((num_class, 3))
     classifier = model.eval()
 
@@ -73,14 +75,20 @@ def test(model, loader, num_class=40):
 
         correct = pred_choice.eq(target_label.long().data).cpu().sum()
         mean_correct.append(correct.item() / float(points.size()[0]))
+        mean_direction_difference.append(0)
+        mean_normal_difference.append(((torch.norm(pred_normal - target_normal, dim=1)*target_label).sum() / target_label.sum()).item())
+        target_radius = target_radius / 1000 # convert pred radius from mm to m
+        target_radius[target_radius == 0] = 0.0001 # avoid divide by zero
         mean_radius_difference.append(((torch.abs(target_radius - torch.flatten(pred_radius))*target_label).sum() / target_label.sum()).item())
 
     class_acc[:, 2] = class_acc[:, 0] / class_acc[:, 1]
     class_acc = np.mean(class_acc[:, 2])
     instance_acc = np.mean(mean_correct)
+    direction_difference = np.mean(mean_direction_difference)
+    normal_difference = np.mean(mean_normal_difference)
     radius_difference = np.mean(mean_radius_difference)
 
-    return instance_acc, class_acc, radius_difference
+    return instance_acc, class_acc, direction_difference, normal_difference, radius_difference
 
 
 def main(args):
@@ -227,7 +235,7 @@ def main(args):
         log_string('Train Instance Accuracy: %f' % train_instance_acc)
 
         with torch.no_grad():
-            instance_acc, class_acc, radius_difference = test(classifier.eval(), testDataLoader, num_class=num_class)
+            instance_acc, class_acc, direction_difference, normal_difference, radius_difference = test(classifier.eval(), testDataLoader, num_class=num_class)
 
             if (instance_acc >= best_instance_acc):
                 best_instance_acc = instance_acc
@@ -235,6 +243,8 @@ def main(args):
 
             if (class_acc >= best_class_acc):
                 best_class_acc = class_acc
+            log_string(f"Test Direction Difference: {direction_difference}")
+            log_string(f"Test Normal Difference: {normal_difference}")
             log_string(f"Test Radius Difference: {radius_difference}")
             log_string('Test Instance Accuracy: %f, Class Accuracy: %f' % (instance_acc, class_acc))
             log_string('Best Instance Accuracy: %f, Class Accuracy: %f' % (best_instance_acc, best_class_acc))
