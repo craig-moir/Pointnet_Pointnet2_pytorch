@@ -61,7 +61,7 @@ def test(model, loader, num_class=40):
             points, target_label, target_direction, target_normal, target_radius = points.cuda(), target_label.cuda(), target_direction.cuda(), target_normal.cuda(), target_radius.cuda()
 
         points = points.transpose(2, 1)
-        pred, _ = classifier(points)
+        pred, _, _, _, _ = classifier(points)
         pred_choice = pred.data.max(1)[1]
 
         for cat in np.unique(target_label.cpu()):
