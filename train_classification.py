@@ -52,9 +52,9 @@ def inplace_relu(m):
 
 def test(model, loader, num_class=40):
     mean_correct = []
-    mean_direction_difference = []
-    mean_normal_difference = []
-    mean_radius_difference = []
+    mean_direction_loss = []
+    mean_normal_loss = []
+    mean_radius_loss = []
     
     class_acc = np.zeros((num_class, 3))
     classifier = model.eval()
@@ -75,20 +75,30 @@ def test(model, loader, num_class=40):
 
         correct = pred_choice.eq(target_label.long().data).cpu().sum()
         mean_correct.append(correct.item() / float(points.size()[0]))
-        mean_direction_difference.append(0)
-        mean_normal_difference.append(((torch.norm(pred_normal - target_normal, dim=1)*target_label).sum() / target_label.sum()).item())
+        
+        direction_loss = (torch.minimum(torch.norm(pred_direction - target_direction, dim=1), torch.norm(pred_direction + target_direction, dim=1))*target_label).sum() / target_label.sum()
+        
+        normal_loss = (torch.norm(pred_normal - target_normal, dim=1)*target_label).sum() / target_label.sum()
+        
         target_radius = target_radius / 1000 # convert pred radius from mm to m
         target_radius[target_radius == 0] = 0.0001 # avoid divide by zero
-        mean_radius_difference.append(((torch.abs(target_radius - torch.flatten(pred_radius))*target_label).sum() / target_label.sum()).item())
+        A5 = 20
+        big_radius_loss = (torch.abs(target_radius - torch.flatten(pred_radius))*target_label).sum() / target_label.sum()
+        small_radius_loss = (torch.abs(target_radius - torch.flatten(pred_radius))/(target_radius*A5)*target_label).sum() / target_label.sum()
+        radius_loss = big_radius_loss + small_radius_loss
+        
+        mean_direction_loss.append(direction_loss.item())
+        mean_normal_loss.append(normal_loss.item())
+        mean_radius_loss.append(radius_loss.item())
 
     class_acc[:, 2] = class_acc[:, 0] / class_acc[:, 1]
     class_acc = np.mean(class_acc[:, 2])
     instance_acc = np.mean(mean_correct)
-    direction_difference = np.mean(mean_direction_difference)
-    normal_difference = np.mean(mean_normal_difference)
-    radius_difference = np.mean(mean_radius_difference)
+    direction_loss = np.mean(mean_direction_loss)
+    normal_loss = np.mean(mean_normal_loss)
+    radius_loss = np.mean(mean_radius_loss)
 
-    return instance_acc, class_acc, direction_difference, normal_difference, radius_difference
+    return instance_acc, class_acc, direction_loss, normal_loss, radius_loss
 
 
 def main(args):
@@ -189,6 +199,10 @@ def main(args):
     for epoch in range(start_epoch, args.epoch):
         log_string('Epoch %d (%d/%s):' % (global_epoch + 1, epoch + 1, args.epoch))
         mean_correct = []
+        mean_loss = []
+        mean_direction_loss = []
+        mean_normal_loss = []
+        mean_radius_loss = []
         classifier = classifier.train()
 
         scheduler.step()
@@ -217,7 +231,8 @@ def main(args):
             # print("target size =", target_label.size())
             # continue
             # exit()
-            loss = criterion(pred_label, pred_direction, pred_normal, pred_radius, target_label.long(), target_direction, target_normal, target_radius, trans_feat)
+            classification_loss, direction_loss, normal_loss, radius_loss = criterion(pred_label, pred_direction, pred_normal, pred_radius, target_label.long(), target_direction, target_normal, target_radius, trans_feat)
+            loss = 2.5*classification_loss + 2*direction_loss + 2*normal_loss + 0.5*radius_loss
             pred_choice = pred_label.data.max(1)[1]
 
             # print(loss)
@@ -227,15 +242,23 @@ def main(args):
 
             correct = pred_choice.eq(target_label.long().data).cpu().sum()
             mean_correct.append(correct.item() / float(points.size()[0]))
+            mean_loss.append(loss.item())
+            mean_direction_loss.append(direction_loss.item())
+            mean_normal_loss.append(normal_loss.item())
+            mean_radius_loss.append(radius_loss.item())
             loss.backward()
             optimizer.step()
             global_step += 1
 
         train_instance_acc = np.mean(mean_correct)
         log_string('Train Instance Accuracy: %f' % train_instance_acc)
+        log_string('Train Loss: %f' % np.mean(mean_loss))
+        log_string('Train Direction Loss: %f' % np.mean(mean_direction_loss))
+        log_string('Train Normal Loss: %f' % np.mean(mean_normal_loss))
+        log_string('Train Radius Loss: %f' % np.mean(mean_radius_loss))
 
         with torch.no_grad():
-            instance_acc, class_acc, direction_difference, normal_difference, radius_difference = test(classifier.eval(), testDataLoader, num_class=num_class)
+            instance_acc, class_acc, direction_loss, normal_loss, radius_loss = test(classifier.eval(), testDataLoader, num_class=num_class)
 
             if (instance_acc >= best_instance_acc):
                 best_instance_acc = instance_acc
@@ -243,9 +266,9 @@ def main(args):
 
             if (class_acc >= best_class_acc):
                 best_class_acc = class_acc
-            log_string(f"Test Direction Difference: {direction_difference}")
-            log_string(f"Test Normal Difference: {normal_difference}")
-            log_string(f"Test Radius Difference: {radius_difference}")
+            log_string(f"Test Direction Loss: {direction_loss}")
+            log_string(f"Test Normal Loss: {normal_loss}")
+            log_string(f"Test Radius Loss: {radius_loss}")
             log_string('Test Instance Accuracy: %f, Class Accuracy: %f' % (instance_acc, class_acc))
             log_string('Best Instance Accuracy: %f, Class Accuracy: %f' % (best_instance_acc, best_class_acc))
 
