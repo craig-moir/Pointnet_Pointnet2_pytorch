@@ -52,6 +52,8 @@ def inplace_relu(m):
 
 def test(model, loader, num_class=40):
     mean_correct = []
+    mean_radius_difference = []
+    mean_normal_difference = []
     class_acc = np.zeros((num_class, 3))
     classifier = model.eval()
 
@@ -61,7 +63,7 @@ def test(model, loader, num_class=40):
             points, target_label, target_direction, target_normal, target_radius = points.cuda(), target_label.cuda(), target_direction.cuda(), target_normal.cuda(), target_radius.cuda()
 
         points = points.transpose(2, 1)
-        pred, _, _, _, _ = classifier(points)
+        pred, pred_direction, pred_normal, pred_radius, _ = classifier(points)
         pred_choice = pred.data.max(1)[1]
 
         for cat in np.unique(target_label.cpu()):
@@ -71,12 +73,14 @@ def test(model, loader, num_class=40):
 
         correct = pred_choice.eq(target_label.long().data).cpu().sum()
         mean_correct.append(correct.item() / float(points.size()[0]))
+        mean_radius_difference.append(((torch.abs(target_radius - torch.flatten(pred_radius))*target_label).sum() / target_label.sum()).item())
 
     class_acc[:, 2] = class_acc[:, 0] / class_acc[:, 1]
     class_acc = np.mean(class_acc[:, 2])
     instance_acc = np.mean(mean_correct)
+    radius_difference = np.mean(mean_radius_difference)
 
-    return instance_acc, class_acc
+    return instance_acc, class_acc, radius_difference
 
 
 def main(args):
@@ -223,7 +227,7 @@ def main(args):
         log_string('Train Instance Accuracy: %f' % train_instance_acc)
 
         with torch.no_grad():
-            instance_acc, class_acc = test(classifier.eval(), testDataLoader, num_class=num_class)
+            instance_acc, class_acc, radius_difference = test(classifier.eval(), testDataLoader, num_class=num_class)
 
             if (instance_acc >= best_instance_acc):
                 best_instance_acc = instance_acc
@@ -231,6 +235,7 @@ def main(args):
 
             if (class_acc >= best_class_acc):
                 best_class_acc = class_acc
+            log_string(f"Test Radius Difference: {radius_difference}")
             log_string('Test Instance Accuracy: %f, Class Accuracy: %f' % (instance_acc, class_acc))
             log_string('Best Instance Accuracy: %f, Class Accuracy: %f' % (best_instance_acc, best_class_acc))
 
