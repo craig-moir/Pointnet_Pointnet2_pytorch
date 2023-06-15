@@ -193,23 +193,23 @@ def main(args):
             points = torch.Tensor(points)
             
             points = points.transpose(2, 1)
-            print(points.size())
+            # print(points.size())
 
             if not args.use_cpu:
                 points, target_label, target_direction, target_normal, target_radius = points.cuda(), target_label.cuda(), target_direction.cuda(), target_normal.cuda(), target_radius.cuda()
 
             pred_label, pred_direction, pred_normal, pred_radius, trans_feat = classifier(points)
             # print(pred)
-            print("pred size =", pred_label.size())
-            print(target_label.long())
-            print("target size =", target_label.size())
+            # print("pred size =", pred_label.size())
+            # print(target_label.long())
+            # print("target size =", target_label.size())
             # continue
             # exit()
             loss = criterion(pred_label, pred_direction, pred_normal, pred_radius, target_label.long(), target_direction, target_normal, target_radius, trans_feat)
             pred_choice = pred_label.data.max(1)[1]
 
-            print(loss)
-            print("loss size:", loss.size())
+            # print(loss)
+            # print("loss size:", loss.size())
             #continue
             #exit()
 
