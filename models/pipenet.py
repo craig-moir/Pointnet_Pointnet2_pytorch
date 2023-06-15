@@ -73,16 +73,21 @@ class get_loss(nn.Module):
         classification_loss = F.nll_loss(pred_label, target_label)
         # print(target_label)
         
-        direction_loss = (torch.minimum(torch.norm(pred_direction - target_direction, dim=1), torch.norm(pred_direction + target_direction, dim=1))*target_label).sum() / target_label.sum()
+        direction_loss = (torch.minimum(torch.norm(pred_direction - target_direction, dim=1), torch.norm(pred_direction + target_direction, dim=1))*target_label).sum()
         
-        normal_loss = (torch.norm(pred_normal - target_normal, dim=1)*target_label).sum() / target_label.sum()
+        normal_loss = (torch.norm(pred_normal - target_normal, dim=1)*target_label).sum()
         
         target_radius = target_radius / 1000 # convert pred radius from mm to m
         target_radius[target_radius == 0] = 0.0001 # avoid divide by zero
         A5 = 20
-        big_radius_loss = (torch.abs(target_radius - torch.flatten(pred_radius))*target_label).sum() / target_label.sum()
-        small_radius_loss = (torch.abs(target_radius - torch.flatten(pred_radius))/(target_radius*A5)*target_label).sum() / target_label.sum()
+        big_radius_loss = (torch.abs(target_radius - torch.flatten(pred_radius))*target_label).sum() 
+        small_radius_loss = (torch.abs(target_radius - torch.flatten(pred_radius))/(target_radius*A5)*target_label).sum()
         radius_loss = big_radius_loss + small_radius_loss
+        
+        if target_label.sum().item() != 0:
+            direction_loss /= target_label.sum()
+            normal_loss /= target_label.sum()
+            radius_loss /= target_label.sum()
         
         # print("classification loss", classification_loss)
         # print("direction loss", direction_loss)
