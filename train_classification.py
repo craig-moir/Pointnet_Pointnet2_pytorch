@@ -55,21 +55,21 @@ def test(model, loader, num_class=40):
     class_acc = np.zeros((num_class, 3))
     classifier = model.eval()
 
-    for j, (points, target) in tqdm(enumerate(loader), total=len(loader)):
+    for j, (points, target_label, target_direction, target_normal, target_radius) in tqdm(enumerate(loader), total=len(loader)):
 
         if not args.use_cpu:
-            points, target = points.cuda(), target.cuda()
+            points, target_label, target_direction, target_normal, target_radius = points.cuda(), target_label.cuda(), target_direction.cuda(), target_normal.cuda(), target_radius.cuda()
 
         points = points.transpose(2, 1)
         pred, _ = classifier(points)
         pred_choice = pred.data.max(1)[1]
 
-        for cat in np.unique(target.cpu()):
-            classacc = pred_choice[target == cat].eq(target[target == cat].long().data).cpu().sum()
-            class_acc[cat, 0] += classacc.item() / float(points[target == cat].size()[0])
+        for cat in np.unique(target_label.cpu()):
+            classacc = pred_choice[target_label == cat].eq(target_label[target_label == cat].long().data).cpu().sum()
+            class_acc[cat, 0] += classacc.item() / float(points[target_label == cat].size()[0])
             class_acc[cat, 1] += 1
 
-        correct = pred_choice.eq(target.long().data).cpu().sum()
+        correct = pred_choice.eq(target_label.long().data).cpu().sum()
         mean_correct.append(correct.item() / float(points.size()[0]))
 
     class_acc[:, 2] = class_acc[:, 0] / class_acc[:, 1]
