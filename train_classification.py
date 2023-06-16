@@ -230,6 +230,14 @@ def main(args):
                 points, target_label, target_direction, target_normal, target_radius = points.cuda(), target_label.cuda(), target_direction.cuda(), target_normal.cuda(), target_radius.cuda()
 
             pred_label, pred_direction, pred_normal, pred_radius, trans_feat = classifier(points)
+            
+            if 1:
+                # visualising the net
+                from torchviz import make_dot
+                y = classifier(points)
+                make_dot(y, params=dict(list(classifier.named_parameters()))).render("pipenet", format="png")
+                exit()
+            
             # print(pred)
             # print("pred size =", pred_label.size())
             # print(target_label.long())
