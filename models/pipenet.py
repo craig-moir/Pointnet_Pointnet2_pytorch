@@ -21,7 +21,8 @@ class get_model(nn.Module):
         self.fc3 = nn.Linear(256, num_class)
         
         self.fc_r = nn.Linear(256, 1)
-        self.fc_3 = nn.Linear(256, 3)
+        self.fc_n = nn.Linear(256, 3)
+        self.fc_d = nn.Linear(256, 3)
 
     def forward(self, xyz):
         B, _, _ = xyz.shape
@@ -49,14 +50,14 @@ class get_model(nn.Module):
         d = l3_points.view(B, 1024)
         d = self.drop1(F.relu(self.bn1(self.fc1(d))))
         d = self.drop2(F.relu(self.bn2(self.fc2(d))))
-        d = self.fc_3(d)
+        d = self.fc_d(d)
         # print("d:", d)
         # print("d size:", d.size())
         
         n = l3_points.view(B, 1024)
         n = self.drop1(F.relu(self.bn1(self.fc1(n))))
         n = self.drop2(F.relu(self.bn2(self.fc2(n))))
-        n = self.fc_3(n)
+        n = self.fc_n(n)
         # print("n:", n)
         # print("n size:", n.size())
         # print("n norm:", torch.norm(n, dim=1))
