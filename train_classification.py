@@ -231,7 +231,7 @@ def main(args):
 
             pred_label, pred_direction, pred_normal, pred_radius, trans_feat = classifier(points)
             
-            if 1:
+            if 0:
                 # visualising the net
                 from torchviz import make_dot
                 y = classifier(points)
