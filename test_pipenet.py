@@ -9,6 +9,7 @@ import importlib
 import torch
 import argparse
 import logging
+import tqdm
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
@@ -39,7 +40,37 @@ def parse_args():
     parser.add_argument('--num_votes', type=int, default=3, help='Aggregate classification scores with voting')
     return parser.parse_args()
 
-def main():
+def farthest_point_sample(point, npoint):
+    """
+    Input:
+        xyz: pointcloud data, [N, D]
+        npoint: number of samples
+    Return:
+        centroids: sampled pointcloud index, [npoint, D]
+    """
+    N, D = point.shape
+    xyz = point[:,:3]
+    centroids = np.zeros((npoint,))
+    distance = np.ones((N,)) * 1e10
+    farthest = np.random.randint(0, N)
+    for i in range(npoint):
+        centroids[i] = farthest
+        centroid = xyz[farthest, :]
+        dist = np.sum((xyz - centroid) ** 2, -1)
+        mask = dist < distance
+        distance[mask] = dist[mask]
+        farthest = np.argmax(distance, -1)
+    point = point[centroids.astype(np.int32)]
+    return point
+
+def pc_normalize(pc):
+    centroid = np.mean(pc, axis=0)
+    pc = pc - centroid
+    m = np.max(np.sqrt(np.sum(pc**2, axis=1)))
+    pc = pc / m
+    return pc
+
+def main(args):
     
     # network
     def log_string(str):
@@ -78,6 +109,7 @@ def main():
 
     checkpoint = torch.load(str(experiment_dir) + '/checkpoints/best_model.pth')
     classifier.load_state_dict(checkpoint['model_state_dict'])
+    classifier = model.eval()
     
     # model creation
     pipe_data_list = pyautopipe.loadASMEPipes()
@@ -168,7 +200,7 @@ def main():
     number_of_points = points.shape[0]
 
     number_of_samples = 100
-    for i in range(number_of_samples):
+    for i in tqdm(range(number_of_samples), total=number_of_samples):
         
         sphere_query_radius = 500 # mm
         
@@ -187,6 +219,29 @@ def main():
             if sample_counter > 10:
                 print("number of points in sample is too low", number_of_points_in_sample, "Exiting...")
                 exit()
+        
+        point_set = sphere_o3d.point["positions"].numpy().astype(np.float32)
+                        
+        point_set = np.hstack((point_set, np.zeros(point_set.shape)))
+        
+        if args.use_uniform_sample:
+            point_set = farthest_point_sample(point_set, args.num_point)
+        else:
+            point_set = point_set[0:args.num_point, :]
+        
+        point_set[:, 0:3] = pc_normalize(point_set[:, 0:3])
+        if not args.use_normals:
+            point_set = point_set[:, 0:3]
+            
+        if not args.use_cpu:
+            points = points.cuda()
+
+        points = points.transpose(2, 1)
+        pred, pred_direction, pred_normal, pred_radius, _ = classifier(points)
+        pred_choice = pred.data.max(1)[1]
+        
+        print(pred_choice, pred, pred_direction, pred_normal, pred_radius)
+        exit()
         
         # print("point:", random_point.numpy())
         # pipe_pos = new_pipe_1.currentTransform[:3, 3]
@@ -231,6 +286,8 @@ def main():
             # yes_cnt += 1
             
             
+        if not args.use_cpu:
+            points, target = points.cuda(), target.cuda()
 
 if __name__ == '__main__':
     args = parse_args()
