@@ -9,7 +9,7 @@ import importlib
 import torch
 import argparse
 import logging
-import tqdm
+from tqdm import tqdm
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
