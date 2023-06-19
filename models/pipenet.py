@@ -105,6 +105,10 @@ class get_loss(nn.Module):
         classification_loss = F.nll_loss(pred_label, target_label)
         # print(target_label)
         
+        # normalising vector output
+        pred_normal = torch.nn.functional.normalize(pred_normal, dim=1)
+        pred_direction = torch.nn.functional.normalize(pred_direction, dim=1)
+        
         direction_loss = (torch.minimum(torch.norm(pred_direction - target_direction, dim=1), torch.norm(pred_direction + target_direction, dim=1))*target_label).sum()
         
         normal_loss = (torch.norm(pred_normal - target_normal, dim=1)*target_label).sum()
