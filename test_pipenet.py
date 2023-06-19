@@ -233,7 +233,7 @@ def main(args):
         if not args.use_normals:
             point_set = point_set[:, 0:3]
             
-        points = torch.from_numpy(point_set)
+        points = torch.tensor(point_set)
             
         if not args.use_cpu:
             points = points.cuda()
