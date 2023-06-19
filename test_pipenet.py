@@ -24,7 +24,7 @@ from pyautopipe.virtual_scan import VirtualScanImage
 import pyautopipe.open3d as ao3d
 
 import pyautopipe
-pyautopipe.setResourcesPath(os.path.join(AUTOPIPEFIT_DIR, 'resources'))
+pyautopipe.setResourcesPath(os.path.join(AUTOPIPEFIT_DIR_2, 'resources'))
 
 def parse_args():
     '''PARAMETERS'''
