@@ -109,7 +109,7 @@ def main(args):
 
     checkpoint = torch.load(str(experiment_dir) + '/checkpoints/best_model.pth')
     classifier.load_state_dict(checkpoint['model_state_dict'])
-    classifier = model.eval()
+    classifier.eval()
     
     # model creation
     pipe_data_list = pyautopipe.loadASMEPipes()
