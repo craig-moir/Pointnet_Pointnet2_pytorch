@@ -297,6 +297,20 @@ def main(args):
                     'optimizer_state_dict': optimizer.state_dict(),
                 }
                 torch.save(state, savepath)
+                
+            if epoch % 10 == 0 or epoch == args.epoch - 1:
+                logger.info('Save model...')
+                savepath = str(checkpoints_dir) + f'/model_epoch_{epoch}.pth'
+                log_string('Saving at %s' % savepath)
+                state = {
+                    'epoch': epoch,
+                    'instance_acc': instance_acc,
+                    'class_acc': class_acc,
+                    'model_state_dict': classifier.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                }
+                torch.save(state, savepath)
+                
             global_epoch += 1
 
     logger.info('End of training...')
