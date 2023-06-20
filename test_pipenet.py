@@ -32,7 +32,7 @@ def parse_args():
     parser.add_argument('--use_cpu', action='store_true', default=False, help='use cpu mode')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--batch_size', type=int, default=24, help='batch size in training')
-    parser.add_argument('--num_category', default=40, type=int, choices=[10, 40],  help='training on ModelNet10/40')
+    parser.add_argument('--num_category', default=40, type=int, choices=[2, 10, 40],  help='training on ModelNet10/40')
     parser.add_argument('--num_point', type=int, default=1024, help='Point Number')
     parser.add_argument('--log_dir', type=str, required=True, help='Experiment root')
     parser.add_argument('--use_normals', action='store_true', default=False, help='use normals')
@@ -100,7 +100,7 @@ def main(args):
 
     '''MODEL LOADING'''
     num_class = args.num_category
-    model_name = os.listdir(experiment_dir + '/logs')[0].split('.')[0]
+    model_name = "pipenet" #os.listdir(experiment_dir + '/logs')[0].split('.')[0]
     model = importlib.import_module(model_name)
 
     classifier = model.get_model(num_class, normal_channel=args.use_normals)
@@ -196,10 +196,12 @@ def main(args):
     # eq_points = scan.pointcloud.select_by_mask(hit_geom == scan.geometry_ids[middle_pipe_geoid]).point["positions"]
     # number_of_points = eq_points.shape[0]
 
-    points = scan.pointcloud.point["positions"]
-    number_of_points = points.shape[0]
+    scan_points = scan.pointcloud.point["positions"]
+    number_of_points = scan_points.shape[0]
+    
+    point_sample_list = []
 
-    number_of_samples = 100
+    number_of_samples = 10
     for i in tqdm(range(number_of_samples), total=number_of_samples):
         
         sphere_query_radius = 500 # mm
@@ -210,7 +212,7 @@ def main(args):
         while number_of_points_in_sample < min_number_of_points_per_case:
         
             random_index = random.randint(0, number_of_points-1)
-            random_point = points[random_index]
+            random_point = scan_points[random_index]
             #print(number_of_points, random_index, random_point.numpy())
             sphere_pcl = pcd_master.sphereFilter(random_point.numpy(), sphere_query_radius, False)
             sphere_o3d = ao3d.CloudToOpen3dTensor(sphere_pcl)
@@ -234,62 +236,70 @@ def main(args):
             point_set = point_set[:, 0:3]
             
         points = torch.tensor(point_set)
-            
-        if not args.use_cpu:
-            points = points.cuda()
+        
+        point_sample_list.append(points)
+        
+    points = torch.stack(point_sample_list, dim=0)
+    points = points.to(torch.float32)
+        
+    # print(points)
+    # exit()
+        
+    if not args.use_cpu:
+        points = points.cuda()
 
-        points = points.transpose(2, 1)
-        pred, pred_direction, pred_normal, pred_radius, _ = classifier(points)
-        pred_choice = pred.data.max(1)[1]
+    points = points.transpose(2, 1)
+    pred, pred_direction, pred_normal, pred_radius, _ = classifier(points)
+    pred_choice = pred.data.max(1)[1]
+    
+    print(pred_choice, pred, pred_direction, pred_normal, pred_radius)
+    exit()
+
+    # print("point:", random_point.numpy())
+    # pipe_pos = new_pipe_1.currentTransform[:3, 3]
+    # print("pipe position:", pipe_pos)
+    # pipe_to_point = random_point.numpy() - pipe_pos
+    # print("pipe to point:", pipe_to_point)
+    # centerline_to_point = pipe_to_point - pipe_to_point * pipe_dir
+    # print("distance point to centerline:", np.linalg.norm(centerline_to_point))
+    # point_normal = centerline_to_point / np.linalg.norm(centerline_to_point)
+    # print("normal at point:", point_normal)
+    
+    # for j in range(number_of_rotation_transforms):
         
-        print(pred_choice, pred, pred_direction, pred_normal, pred_radius)
-        exit()
+        # sphere_o3d_copy = sphere_o3d.clone()
         
-        # print("point:", random_point.numpy())
-        # pipe_pos = new_pipe_1.currentTransform[:3, 3]
-        # print("pipe position:", pipe_pos)
-        # pipe_to_point = random_point.numpy() - pipe_pos
-        # print("pipe to point:", pipe_to_point)
-        # centerline_to_point = pipe_to_point - pipe_to_point * pipe_dir
-        # print("distance point to centerline:", np.linalg.norm(centerline_to_point))
-        # point_normal = centerline_to_point / np.linalg.norm(centerline_to_point)
-        # print("normal at point:", point_normal)
+        # T1 = np.identity(4)
+        # T1[:3, :3] = R.from_euler('x', random.uniform(-180, 180), degrees=True).as_matrix()
         
-        # for j in range(number_of_rotation_transforms):
-            
-            # sphere_o3d_copy = sphere_o3d.clone()
-            
-            # T1 = np.identity(4)
-            # T1[:3, :3] = R.from_euler('x', random.uniform(-180, 180), degrees=True).as_matrix()
-            
-            # T2 = np.identity(4)
-            # T2[:3, :3] = R.from_euler('y', random.uniform(-180, 180), degrees=True).as_matrix()
-            
-            # T = T2.dot(T1)
-            
-            # sphere_o3d_copy.transform(T)
-            
-            # transformed_point_normal = np.dot(T[:3, :3], point_normal)
-            # transformed_pipe_dir = np.dot(T[:3, :3], pipe_dir)
-            
-            # assert(np.linalg.norm(transformed_point_normal) - 1 < 1e-6)
-            # assert(np.linalg.norm(transformed_pipe_dir) - 1 < 1e-6)
-            # # print(transformed_point_normal, transformed_pipe_dir, np.cross(transformed_point_normal, transformed_pipe_dir), np.linalg.norm(np.cross(transformed_point_normal, transformed_pipe_dir)))
-            # assert(np.linalg.norm(np.cross(transformed_point_normal, transformed_pipe_dir)) - 1 < 1e-6)
+        # T2 = np.identity(4)
+        # T2[:3, :3] = R.from_euler('y', random.uniform(-180, 180), degrees=True).as_matrix()
         
-            # numpy_positions = sphere_o3d_copy.point["positions"].numpy()
+        # T = T2.dot(T1)
         
-            # numpy_positions = np.hstack((numpy_positions, np.zeros(numpy_positions.shape)))
-            # # print(sphere_o3d.point["positions"])
-            # # ao3d.visualise(sphere_o3d_copy.to_legacy())
-            # case_filename = os.path.join(YES_PIPE_DIR, f"pipe_{yes_cnt:05d}_d_{'_'.join(transformed_pipe_dir.astype(str))}_n_{'_'.join(transformed_point_normal.astype(str))}_r_{float(nominal_diameter)/2}.txt")
-            # print(f"saving {case_filename}")
-            # np.savetxt(case_filename, numpy_positions, delimiter=',')
-            # yes_cnt += 1
-            
-            
-        if not args.use_cpu:
-            points, target = points.cuda(), target.cuda()
+        # sphere_o3d_copy.transform(T)
+        
+        # transformed_point_normal = np.dot(T[:3, :3], point_normal)
+        # transformed_pipe_dir = np.dot(T[:3, :3], pipe_dir)
+        
+        # assert(np.linalg.norm(transformed_point_normal) - 1 < 1e-6)
+        # assert(np.linalg.norm(transformed_pipe_dir) - 1 < 1e-6)
+        # # print(transformed_point_normal, transformed_pipe_dir, np.cross(transformed_point_normal, transformed_pipe_dir), np.linalg.norm(np.cross(transformed_point_normal, transformed_pipe_dir)))
+        # assert(np.linalg.norm(np.cross(transformed_point_normal, transformed_pipe_dir)) - 1 < 1e-6)
+    
+        # numpy_positions = sphere_o3d_copy.point["positions"].numpy()
+    
+        # numpy_positions = np.hstack((numpy_positions, np.zeros(numpy_positions.shape)))
+        # # print(sphere_o3d.point["positions"])
+        # # ao3d.visualise(sphere_o3d_copy.to_legacy())
+        # case_filename = os.path.join(YES_PIPE_DIR, f"pipe_{yes_cnt:05d}_d_{'_'.join(transformed_pipe_dir.astype(str))}_n_{'_'.join(transformed_point_normal.astype(str))}_r_{float(nominal_diameter)/2}.txt")
+        # print(f"saving {case_filename}")
+        # np.savetxt(case_filename, numpy_positions, delimiter=',')
+        # yes_cnt += 1
+        
+        
+    if not args.use_cpu:
+        points, target = points.cuda(), target.cuda()
 
 if __name__ == '__main__':
     args = parse_args()
