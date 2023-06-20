@@ -296,10 +296,10 @@ def main(args):
                 vis.capture_screen_image(os.path.join(ANIMATION_DIR, "tmp_%04d.jpg" % anim_cnt), do_render=True)
                 anim_cnt += 1
         
-        cylinder_direction = pred_direction[i].detach().numpy()
+        cylinder_direction = pred_direction[i].cpu().detach().numpy()
         cylinder_radius =  pred_radius[i][0].item()*1000
         
-        centerline_point = seed_point_list[i].numpy() - pred_normal[i].detach().numpy() * cylinder_radius
+        centerline_point = seed_point_list[i].numpy() - pred_normal[i].cpu().detach().numpy() * cylinder_radius
         
         cylinder = o3d.geometry.TriangleMesh.create_cylinder(cylinder_radius, 50)
         cylinder.paint_uniform_color(np.array([1, 1, 0]))
