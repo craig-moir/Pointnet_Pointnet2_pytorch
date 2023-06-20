@@ -215,7 +215,7 @@ def main(args):
     sphere_o3d_pcd_list = []
     point_sample_list = []
 
-    number_of_samples = 10
+    number_of_samples = 100
     for i in tqdm(range(number_of_samples), total=number_of_samples):
         
         sphere_query_radius = 500 # mm
