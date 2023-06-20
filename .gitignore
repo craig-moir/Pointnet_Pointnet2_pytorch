@@ -12,6 +12,9 @@ data/*
 # log dir
 log/*
 
+# animation images
+animation/*
+
 # Distribution / packaging
 .Python
 build/
