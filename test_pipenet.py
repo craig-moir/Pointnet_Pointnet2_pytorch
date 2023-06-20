@@ -287,7 +287,7 @@ def main(args):
         
         sphere.compute_vertex_normals()
         sphere.paint_uniform_color(np.array([1, 0, 0]))
-        # vis.add_geometry(sphere)
+        vis.add_geometry(sphere)
         
         for pp in range(PAUSE_FRAMES):
             vis.poll_events()    
