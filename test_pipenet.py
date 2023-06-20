@@ -15,6 +15,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
+ANIMATION_DIR = os.path.join(ROOT_DIR, "animation")
+os.makedirs(ANIMATION_DIR, exist_ok=True)
+
 AUTOPIPEFIT_DIR = os.path.join("/", "home", "craig", "autopipefit")
 sys.path.insert(0, os.path.join(AUTOPIPEFIT_DIR, "pysrc"))
 AUTOPIPEFIT_DIR_2 = os.path.join(ROOT_DIR, "autopipefit")
@@ -160,7 +163,15 @@ def main(args):
         10000
     ])
     scan.take_scan(origin, noise_sigma=noise_sigma, max_distance=50000)
+    
+    PAUSE_FRAMES = 15
+    SAVE_IMAGES = False
+    anim_cnt = 0
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(visible=True)
 
+    vis.add_geometry(scan.pointcloud.to_legacy().paint_uniform_color([0.4, 0.4, 0.4]))
+    
     # origin = np.array([
     #     -3000, 
     #     -3000, 
@@ -199,6 +210,8 @@ def main(args):
     scan_points = scan.pointcloud.point["positions"]
     number_of_points = scan_points.shape[0]
     
+    seed_point_list = []
+    sphere_o3d_pcd_list = []
     point_sample_list = []
 
     number_of_samples = 10
@@ -237,6 +250,8 @@ def main(args):
             
         points = torch.tensor(point_set)
         
+        seed_point_list.append(random_point)
+        sphere_o3d_pcd_list.append(sphere_o3d)
         point_sample_list.append(points)
         
     points = torch.stack(point_sample_list, dim=0)
@@ -252,7 +267,61 @@ def main(args):
     pred, pred_direction, pred_normal, pred_radius, _ = classifier(points)
     pred_choice = pred.data.max(1)[1]
     
+    pred_normal = torch.nn.functional.normalize(pred_normal, dim=1)
+    pred_direction = torch.nn.functional.normalize(pred_direction, dim=1)
+    
     print(pred_choice, pred, pred_direction, pred_normal, pred_radius)
+    
+    for i in tqdm(range(number_of_samples), total=number_of_samples):
+        
+        sphere_point_cloud_for_vis = sphere_o3d_pcd_list[i].to_legacy().paint_uniform_color(np.array([0, 1, 0]))
+        vis.add_geometry(sphere_point_cloud_for_vis)
+        
+        sphere = o3d.geometry.TriangleMesh.create_sphere(20)
+        sphere.paint_uniform_color(np.array([0.5, 0.5, 0.5]))
+        
+        T = np.identity(4)
+        T[:3,3] = seed_point_list[i].numpy()
+        sphere.transform(T)
+        
+        sphere.compute_vertex_normals()
+        sphere.paint_uniform_color(np.array([1, 0, 0]))
+        # vis.add_geometry(sphere)
+        
+        for pp in range(PAUSE_FRAMES):
+            vis.poll_events()    
+            vis.update_renderer()
+            if SAVE_IMAGES:
+                vis.capture_screen_image(os.path.join(ANIMATION_DIR, "tmp_%04d.jpg" % anim_cnt), do_render=True)
+                anim_cnt += 1
+        
+        cylinder_direction = pred_direction[i].detach().numpy()
+        cylinder_radius =  pred_radius[i][0].item()*1000
+        
+        centerline_point = seed_point_list[i].numpy() - pred_normal[i].detach().numpy() * cylinder_radius
+        
+        cylinder = o3d.geometry.TriangleMesh.create_cylinder(cylinder_radius, 50)
+        cylinder.paint_uniform_color(np.array([1, 1, 0]))
+        
+        T = pyautopipe.getTransformationMatrixPointingBetweenTwoPoints(centerline_point, centerline_point + cylinder_direction)
+        cylinder.transform(T)
+        
+        cylinder.compute_vertex_normals()
+        vis.add_geometry(cylinder)
+        
+        for pp in range(PAUSE_FRAMES):
+            vis.poll_events()    
+            vis.update_renderer()
+            if SAVE_IMAGES:
+                vis.capture_screen_image(os.path.join(ANIMATION_DIR, "tmp_%04d.jpg" % anim_cnt), do_render=True)
+                anim_cnt += 1
+    
+        vis.remove_geometry(sphere_point_cloud_for_vis)
+        
+            
+    while vis.poll_events():
+        vis.update_renderer()
+        
     exit()
 
     # print("point:", random_point.numpy())
@@ -298,9 +367,6 @@ def main(args):
         # yes_cnt += 1
         
         
-    if not args.use_cpu:
-        points, target = points.cuda(), target.cuda()
-
 if __name__ == '__main__':
     args = parse_args()
     main(args)
