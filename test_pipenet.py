@@ -165,7 +165,7 @@ def main(args):
     ])
     scan.take_scan(origin, noise_sigma=noise_sigma, max_distance=50000)
     
-    PAUSE_FRAMES = 15
+    PAUSE_FRAMES = 30
     SAVE_IMAGES = False
     anim_cnt = 0
     vis = o3d.visualization.Visualizer()
