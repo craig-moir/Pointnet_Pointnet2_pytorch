@@ -304,6 +304,10 @@ def main(args):
         cylinder = o3d.geometry.TriangleMesh.create_cylinder(cylinder_radius, 50)
         cylinder.paint_uniform_color(np.array([1, 1, 0]))
         
+        initT = np.identity(4)
+        initT[:3, :3] = R.from_euler('y', 90, degrees=True).as_matrix()
+        cylinder.transform(initT)
+        
         T = pyautopipe.getTransformationMatrixPointingBetweenTwoPoints(centerline_point, centerline_point + cylinder_direction)
         cylinder.transform(T)
         
