@@ -41,6 +41,7 @@ def parse_args():
     parser.add_argument('--use_normals', action='store_true', default=False, help='use normals')
     parser.add_argument('--use_uniform_sample', action='store_true', default=False, help='use uniform sampiling')
     parser.add_argument('--num_votes', type=int, default=3, help='Aggregate classification scores with voting')
+    parser.add_argument('--weights_name', default='best_model.pth', help='saved weights filename [default: best_model.pth]')
     return parser.parse_args()
 
 def farthest_point_sample(point, npoint):
@@ -110,7 +111,7 @@ def main(args):
     if not args.use_cpu:
         classifier = classifier.cuda()
 
-    checkpoint = torch.load(str(experiment_dir) + '/checkpoints/best_model.pth')
+    checkpoint = torch.load(str(experiment_dir) + f'/checkpoints/{args.weights_name}')
     classifier.load_state_dict(checkpoint['model_state_dict'])
     classifier.eval()
     
